@@ -26,4 +26,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Download Dalamud development assemblies
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile dalamud.zip
+          Expand-Archive -LiteralPath dalamud.zip -DestinationPath .dalamud
+          "DALAMUD_HOME=$env:GITHUB_WORKSPACE\.dalamud" >> $env:GITHUB_ENV
       - run: dotnet build apps/dalamud/TournamentControl.Dalamud.csproj --configuration Release
