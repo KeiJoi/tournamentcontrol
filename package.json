@@ -1,0 +1,16 @@
+{
+  "name": "tournament-control",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@11.6.2",
+  "workspaces": ["apps/server", "apps/web", "packages/shared"],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:server": "npm run dev --workspace=@tournament-control/server",
+    "dev:web": "npm run dev --workspace=@tournament-control/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {"typescript": "^5.9.3"}
+}

@@ -1,0 +1,13 @@
+# Database
+
+The production database path is `/var/data/vat-tournaments.sqlite`; development reads `DATABASE_PATH`. Every connection enables `foreign_keys`, WAL journal mode, and a 5-second busy timeout. Schema migrations are explicit, ordered TypeScript migrations, applied atomically where SQLite permits, and recorded in `schema_migrations`; no ORM auto-sync is used.
+
+Core tables are `organizers`, `tournaments`, `contestants`, `rounds`, `matches`, `match_events`, and `audit_events`. Organizer records keep only an Argon2id key hash, a deterministic lookup digest, and an optional harmless key prefix—never a plaintext key. `tournaments` includes a stable ID, organizer ID, public short code, venue/game/tournament names, event date, format, status, creation/update/start/completion/cancellation/expiration timestamps, and integer revision. Public short codes are globally unique (case-insensitively).
+
+Dependent tournament data uses foreign keys with `ON DELETE CASCADE`; deleting a tournament removes its bracket, match history, and tournament audit events. Composite foreign keys ensure matches, contestants, rounds, winners, and advancement links all belong to the same tournament. A match links to a later winner match for single-elimination advancement and permits null contestants for byes. Audit event types cover organizer/tournament lifecycle, contestant and seed changes, result correction/reopening, deletion, and master overrides; payloads are immutable valid JSON without credentials. The persistence layer exposes repositories and a transaction-owning service so route handlers never embed SQL.
+
+On startup and every hour, retention removes only completed/cancelled tournaments whose completion/cancellation timestamp is at least `RETENTION_DAYS` old. `expires_at` is persisted as the client-visible calculated expiration timestamp during the state change, while cleanup independently applies the configured retention interval. Setup and active tournaments are never automatically removed.
+
+## Backups
+
+At startup and every 24 hours, the server creates a SQLite-consistent backup with SQLite's backup API. It never copies the live main database file while WAL mode is active. Production backups are written under `/var/data/backups/`; development backups are placed beside the configured database in a `backups` directory. `SQLITE_BACKUP_COUNT` controls rolling retention (default `7`, bounded to 1–365). Only completed snapshots count toward retention; incomplete output is removed after a failed backup attempt. Backup directory validation and individual backup failures are logged generically and do not prevent the authoritative service from starting.

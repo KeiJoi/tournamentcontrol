@@ -1,0 +1,19 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>TournamentControl.Dalamud</AssemblyName>
+    <!-- This is the single release-version source. Release tags must be v$(Version). -->
+    <Version>0.1.0</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <Name>Tournament Bracket Controller</Name>
+    <InternalName>TournamentControl.Dalamud</InternalName>
+    <Author>KeiJoi</Author>
+    <Punchline>Control live tournament brackets from inside FFXIV.</Punchline>
+    <Description>Run and control live single-elimination tournament brackets from inside Final Fantasy XIV.</Description>
+    <MinimumDalamudVersion>15.0.0</MinimumDalamudVersion>
+  </PropertyGroup>
+</Project>

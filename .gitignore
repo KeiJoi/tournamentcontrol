@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+apps/dalamud/bin/
+apps/dalamud/obj/
+.vs/
+*.user
+*.suo

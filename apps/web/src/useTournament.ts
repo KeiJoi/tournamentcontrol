@@ -1,0 +1,13 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SpectatorState } from "./tournament.js";
+import { wsUrl } from "./tournament.js";
+
+const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+export function useTournament(code: string | undefined) {
+  const [state, setState] = useState<SpectatorState>(); const [loading, setLoading] = useState(true); const [notFound, setNotFound] = useState(false); const [connection, setConnection] = useState<"connecting" | "live" | "reconnecting" | "offline">("connecting");
+  const revision = useRef<number | undefined>(undefined); const retry = useRef<number | undefined>(undefined); const hasState = useRef(false);
+  const fetchState = useCallback(async () => { if (!code) return; setLoading(true); try { const response = await fetch(`${apiBase}/api/public/tournaments/${encodeURIComponent(code)}`); if (response.status === 404) { setNotFound(true); return; } if (!response.ok) throw new Error("Unable to load tournament."); const data = await response.json() as SpectatorState; revision.current = data.tournament.revision; hasState.current = true; setState(data); setNotFound(false); } catch { setConnection("offline"); } finally { setLoading(false); } }, [code]);
+  useEffect(() => { void fetchState(); }, [fetchState]);
+  useEffect(() => { if (!code) return; let socket: WebSocket | undefined; let disposed = false; const connect = () => { setConnection(hasState.current ? "reconnecting" : "connecting"); socket = new WebSocket(wsUrl()); socket.onopen = () => { setConnection("live"); socket!.send(JSON.stringify({ version: 1, type: "subscribe", data: { tournamentCode: code } })); }; socket.onmessage = (event) => { try { const message = JSON.parse(event.data) as { type?: string; revision?: number; data?: SpectatorState }; if (message.type === "tournament.snapshot" || message.type === "tournament.updated" || message.type === "tournament.completed") { const incoming = message.data; if (!incoming || (revision.current !== undefined && message.revision !== undefined && message.revision > revision.current + 1)) { void fetchState(); return; } revision.current = incoming.tournament.revision; hasState.current = true; setState(incoming); } } catch { void fetchState(); } }; socket.onclose = () => { if (!disposed) { setConnection("reconnecting"); retry.current = window.setTimeout(() => { void fetchState(); connect(); }, 2_000); } }; socket.onerror = () => socket?.close(); }; connect(); return () => { disposed = true; if (retry.current) window.clearTimeout(retry.current); socket?.close(); }; }, [code, fetchState]);
+  return { state, loading, notFound, connection, refetch: fetchState };
+}

@@ -1,0 +1,96 @@
+name: Dalamud Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build, test, and package
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+      - id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content apps/dalamud/TournamentControl.Dalamud.csproj
+          $version = $project.Project.PropertyGroup.Version | Select-Object -First 1
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'The plugin Version must be a stable three-part semantic version.' }
+          if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -ne "v$version") { throw 'The Git tag must exactly match the plugin Version.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Verify checked-in repository metadata
+        shell: pwsh
+        run: |
+          $generated = (node scripts/generate-dalamud-repository.mjs | Out-String) -replace "`r`n", "`n"
+          $tracked = (Get-Content repo/repository.json -Raw) -replace "`r`n", "`n"
+          if ($generated.TrimEnd() -ne $tracked.TrimEnd()) { throw 'repo/repository.json must be regenerated after plugin metadata changes.' }
+      - run: dotnet test apps/dalamud.tests/TournamentControl.Dalamud.Tests.csproj --configuration Release
+      - run: dotnet build apps/dalamud/TournamentControl.Dalamud.csproj --configuration Release
+      - shell: pwsh
+        run: |
+          $source = Get-ChildItem apps/dalamud/bin/Release -Recurse -Filter latest.zip | Select-Object -First 1
+          if ($null -eq $source) { throw 'DalamudPackager did not create latest.zip.' }
+          $destination = "artifacts/TournamentBracketController-v${{ steps.version.outputs.version }}.zip"
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          Copy-Item -LiteralPath $source.FullName -Destination $destination
+          ./scripts/verify-dalamud-package.ps1 -PackagePath $destination -ExpectedVersion '${{ steps.version.outputs.version }}' -ExpectedInternalName TournamentControl.Dalamud
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TournamentBracketController-v${{ steps.version.outputs.version }}
+          path: artifacts/TournamentBracketController-v${{ steps.version.outputs.version }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish tagged release and repository metadata
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+      - uses: actions/download-artifact@v4
+        with:
+          name: TournamentBracketController-v${{ needs.package.outputs.version }}
+          path: artifacts
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/TournamentBracketController-v${{ needs.package.outputs.version }}.zip --title "$GITHUB_REF_NAME" --generate-notes
+      - id: metadata
+        run: echo "last_update=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+      - name: Generate and validate custom repository metadata
+        run: |
+          node scripts/generate-dalamud-repository.mjs --tag "$GITHUB_REF_NAME" --last-update "${{ steps.metadata.outputs.last_update }}" --output _site/repository.json
+          node --input-type=module -e "const data = JSON.parse(await (await import('node:fs/promises')).readFile('_site/repository.json', 'utf8')); if (!Array.isArray(data) || data.length !== 1 || !data[0].DownloadLinkInstall.includes('/releases/download/')) throw new Error('Invalid custom repository metadata.');"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
