@@ -8,24 +8,25 @@ namespace TournamentControl.Dalamud.Services;
 public sealed class TournamentApiClient(HttpClient httpClient) : IDisposable
 {
     private string? accessToken;
+    private Uri? serverUri;
     public DateTimeOffset? SessionExpiresAt { get; private set; }
 
     public void ConfigureServer(string serverUrl)
     {
         if (!Uri.TryCreate(serverUrl.TrimEnd('/') + "/", UriKind.Absolute, out var uri))
             throw new ArgumentException("Enter a valid absolute server URL.", nameof(serverUrl));
-        httpClient.BaseAddress = uri;
+        serverUri = uri;
     }
 
     public async Task<bool> IsHealthyAsync(CancellationToken cancellationToken)
     {
-        using var response = await httpClient.GetAsync("/health", cancellationToken);
+        using var response = await httpClient.GetAsync(Endpoint("health"), cancellationToken);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<SessionResponse> AuthenticateAsync(string serverPassword, string userKey, CancellationToken cancellationToken)
     {
-        var response = await httpClient.PostAsJsonAsync("api/controller/sessions", new { serverAccessPassword = serverPassword, userKey }, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(Endpoint("api/controller/sessions"), new { serverAccessPassword = serverPassword, userKey }, cancellationToken);
         if (response.StatusCode == HttpStatusCode.Unauthorized) throw new UnauthorizedAccessException("Server password or user key was rejected.");
         response.EnsureSuccessStatusCode();
         var session = await response.Content.ReadFromJsonAsync<SessionResponse>(cancellationToken) ?? throw new InvalidOperationException("Server returned no session.");
@@ -34,7 +35,7 @@ public sealed class TournamentApiClient(HttpClient httpClient) : IDisposable
 
     public async Task<SessionResponse> CreateOrganizerAsync(string serverPassword, string userKey, CancellationToken cancellationToken)
     {
-        var response = await httpClient.PostAsJsonAsync("api/controller/organizers", new { serverAccessPassword = serverPassword, userKey }, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(Endpoint("api/controller/organizers"), new { serverAccessPassword = serverPassword, userKey }, cancellationToken);
         if (response.StatusCode == HttpStatusCode.Unauthorized) throw new UnauthorizedAccessException("Server password was rejected.");
         response.EnsureSuccessStatusCode();
         var session = await response.Content.ReadFromJsonAsync<SessionResponse>(cancellationToken) ?? throw new InvalidOperationException("Server returned no session.");
@@ -63,7 +64,8 @@ public sealed class TournamentApiClient(HttpClient httpClient) : IDisposable
     public async Task<ControllerState> RecordWinnerAsync(string tournamentId, string matchId, int revision, string winnerId, CancellationToken cancellationToken) { using var request = Authorized(HttpMethod.Post, "api/controller/tournaments/" + tournamentId + "/matches/" + matchId + "/result"); request.Content = JsonContent.Create(new { expectedRevision = revision, winnerId }); return await SendStateAsync(request, cancellationToken); }
     public async Task<ControllerState> CorrectAsync(string tournamentId, string matchId, int revision, string winnerId, bool rollback, CancellationToken cancellationToken) { using var request = Authorized(HttpMethod.Post, "api/controller/tournaments/" + tournamentId + "/matches/" + matchId + "/correction"); request.Content = JsonContent.Create(new { expectedRevision = revision, winnerId, rollbackDownstream = rollback }); return await SendStateAsync(request, cancellationToken); }
     private async Task<ControllerState> SendStateAsync(HttpRequestMessage request, CancellationToken cancellationToken) { using var response = await httpClient.SendAsync(request, cancellationToken); if (response.StatusCode == HttpStatusCode.Conflict) throw new InvalidOperationException("Tournament changed on another controller; refreshing state."); await ThrowIfExpiredAsync(response); return await response.Content.ReadFromJsonAsync<ControllerState>(cancellationToken) ?? throw new InvalidOperationException("Server returned no state."); }
-    private HttpRequestMessage Authorized(HttpMethod method, string url) { var request = new HttpRequestMessage(method, url); request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken); return request; }
+    private HttpRequestMessage Authorized(HttpMethod method, string url) { var request = new HttpRequestMessage(method, Endpoint(url)); request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken); return request; }
+    private Uri Endpoint(string path) => serverUri is null ? throw new InvalidOperationException("Configure the server before making a request.") : new Uri(serverUri, path.TrimStart('/'));
     private async Task ThrowIfExpiredAsync(HttpResponseMessage response) { if (response.StatusCode == HttpStatusCode.Unauthorized) { ClearSession(); throw new UnauthorizedAccessException("Session expired. Authenticate again."); } response.EnsureSuccessStatusCode(); await Task.CompletedTask; }
     private void EnsureSession() { if (!HasValidSession) throw new UnauthorizedAccessException("Authenticate before loading tournaments."); }
     public void Dispose() => httpClient.Dispose();
