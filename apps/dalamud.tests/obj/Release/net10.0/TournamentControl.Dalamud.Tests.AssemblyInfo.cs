@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TournamentControl.Dalamud.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ebeae4c55eb66472173a03dd3b170489245f47d3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6794f4610f4966497ec918497ce61b0182c89786")]
 [assembly: System.Reflection.AssemblyProductAttribute("TournamentControl.Dalamud.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TournamentControl.Dalamud.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
