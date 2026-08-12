@@ -66,7 +66,7 @@ describe("full tournament integration", () => {
     const controllerBLogin = await request(server).post("/api/controller/sessions").send({ serverAccessPassword: credentials.serverAccessPassword, userKey }); expect(controllerBLogin.status).toBe(200); const controllerB = controllerBLogin.body.accessToken as string;
     const otherOrganizer = await request(server).post("/api/controller/organizers").send({ serverAccessPassword: credentials.serverAccessPassword, userKey: otherUserKey }); expect(otherOrganizer.status).toBe(201);
 
-    const createdTournament = await request(server).post("/api/controller/tournaments").set(authorization(controllerA)).send({ venueName: "The Vat", gameName: "Deathroll", tournamentName: "Test Deathroll", eventDate: "2026-08-15T19:00:00.000Z" });
+    const createdTournament = await request(server).post("/api/controller/tournaments").set(authorization(controllerA)).send({ venueName: "The Vat", gameName: "Deathroll", tournamentName: "Test Deathroll", eventDate: "2026-08-15T19:00:00.000-05:00" });
     expect(createdTournament.status).toBe(201); const tournamentId = createdTournament.body.tournament.id as string; const publicCode = createdTournament.body.tournament.publicCode as string;
     let revision = createdTournament.body.tournament.revision as number;
     for (let index = 1; index <= 13; index++) { const added = await request(server).post(`/api/controller/tournaments/${tournamentId}/contestants`).set(authorization(controllerA)).send({ expectedRevision: revision, displayName: `Player ${index}` }); expect(added.status).toBe(201); revision = added.body.tournament.revision; }
@@ -92,7 +92,7 @@ describe("full tournament integration", () => {
     }
     expect(state.tournament.status).toBe("COMPLETED"); expect(state.tournament.completedAt).toBeTruthy(); expect(state.tournament.expiresAt).toBeTruthy();
     const publicCompleted = await request(server).get(`/api/public/tournaments/${publicCode}`); expect(publicCompleted.status).toBe(200); expect(publicCompleted.body.champion).toBeTruthy();
-    for (const query of [{ q: "Test Deathroll" }, { venueName: "The Vat" }, { gameName: "Deathroll" }, { eventDate: "2026-08-15T19:00:00.000Z" }]) { const listing = await request(server).get("/api/controller/tournaments").query(query).set(authorization(controllerA)); expect(listing.status).toBe(200); expect(listing.body.tournaments.some((item: { id: string }) => item.id === tournamentId)).toBe(true); }
+    for (const query of [{ q: "Test Deathroll" }, { venueName: "The Vat" }, { gameName: "Deathroll" }, { eventDate: "2026-08-15T19:00:00.000-05:00" }]) { const listing = await request(server).get("/api/controller/tournaments").query(query).set(authorization(controllerA)); expect(listing.status).toBe(200); expect(listing.body.tournaments.some((item: { id: string }) => item.id === tournamentId)).toBe(true); }
     expect((await request(server).get(`/api/controller/tournaments/${tournamentId}/state`).set(authorization(otherOrganizer.body.accessToken))).status).toBe(404); expect((await request(server).patch(`/api/public/tournaments/${publicCode}`).send({})).status).toBe(404);
 
     const setup = tournaments.tournaments.create({ id: randomUUID(), organizerId: createdOrganizer.body.organizer.id, publicCode: "SETUP2", venueName: "The Vat", gameName: "Deathroll", tournamentName: "Setup survives", eventDate: "2026-08-16T19:00:00.000Z" });

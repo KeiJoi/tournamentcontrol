@@ -13,10 +13,10 @@ const masterCredentialSchema = z.object({ masterAdminPassword: z.string().min(1)
 const editTournamentSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   venueName: z.string().trim().min(1).max(200).optional(), gameName: z.string().trim().min(1).max(200).optional(),
-  tournamentName: z.string().trim().min(1).max(200).optional(), eventDate: z.iso.datetime().optional(),
+  tournamentName: z.string().trim().min(1).max(200).optional(), eventDate: z.iso.datetime({ offset: true }).optional(),
 }).refine((value) => Object.keys(value).some((key) => key !== "expectedRevision"), "At least one editable field is required.");
 const revisionSchema = z.object({ expectedRevision: z.number().int().nonnegative() });
-const createTournamentSchema = z.object({ venueName: z.string().trim().min(1).max(200), gameName: z.string().trim().min(1).max(200), tournamentName: z.string().trim().min(1).max(200), eventDate: z.iso.datetime() });
+const createTournamentSchema = z.object({ venueName: z.string().trim().min(1).max(200), gameName: z.string().trim().min(1).max(200), tournamentName: z.string().trim().min(1).max(200), eventDate: z.iso.datetime({ offset: true }) });
 const masterActionSchema = z.object({ confirmation: z.string().min(1).max(128) });
 const masterAuditQuerySchema = z.object({ organizerId: z.string().min(1).max(128).optional(), tournamentId: z.string().min(1).max(128).optional(), limit: z.coerce.number().int().min(1).max(250).optional() });
 const masterLoginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -70,7 +70,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   app.get("/api/controller/tournaments", (request, response) => {
     try {
       const principal = requireAuth(request, dependencies.auth, "ORGANIZER");
-      const query = z.object({ q: z.string().max(200).optional(), tournamentName: z.string().max(200).optional(), venueName: z.string().max(200).optional(), gameName: z.string().max(200).optional(), eventDate: z.iso.datetime().optional(), status: z.enum(["SETUP", "ACTIVE", "COMPLETED", "CANCELLED"]).optional() }).safeParse(request.query); if (!query.success) return error(response, 400, "INVALID_REQUEST", "Invalid request.");
+      const query = z.object({ q: z.string().max(200).optional(), tournamentName: z.string().max(200).optional(), venueName: z.string().max(200).optional(), gameName: z.string().max(200).optional(), eventDate: z.iso.datetime({ offset: true }).optional(), status: z.enum(["SETUP", "ACTIVE", "COMPLETED", "CANCELLED"]).optional() }).safeParse(request.query); if (!query.success) return error(response, 400, "INVALID_REQUEST", "Invalid request.");
       const needle = (query.data.q ?? "").toLocaleLowerCase(); const tournaments = dependencies.tournaments!.tournaments.listByOrganizer(principal.organizer.id).filter((item) => (!needle || [item.tournamentName, item.venueName, item.gameName].some((value) => value.toLocaleLowerCase().includes(needle))) && (!query.data.tournamentName || item.tournamentName.toLocaleLowerCase().includes(query.data.tournamentName.toLocaleLowerCase())) && (!query.data.venueName || item.venueName.toLocaleLowerCase().includes(query.data.venueName.toLocaleLowerCase())) && (!query.data.gameName || item.gameName.toLocaleLowerCase().includes(query.data.gameName.toLocaleLowerCase())) && (!query.data.eventDate || item.eventDate === query.data.eventDate) && (!query.data.status || item.status === query.data.status));
       return response.json({ tournaments: tournaments.map((item) => ({ ...controllerTournament(item), playerCount: dependencies.tournaments!.bracket.countContestants(item.id) })) });
     } catch (exception) { return authenticationFailure(response, exception); }
