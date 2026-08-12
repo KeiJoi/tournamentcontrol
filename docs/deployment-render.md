@@ -5,7 +5,7 @@ Tournament Control is deployed as one Render Node web service with one 1 GB pers
 ## Create the service
 
 1. Push this repository to a Git provider and create a Render **Web Service** from it, or create it from the included `render.yaml` Blueprint.
-2. Select the Node runtime. Use build command `npm ci && npm run build` and start command `npm run start --workspace=@tournament-control/server`.
+2. Select the Node runtime. Use build command `npm ci --include=dev && npm run build` and start command `npm run start --workspace=@tournament-control/server`. The build needs development dependencies even though the running service uses `NODE_ENV=production`.
 3. Attach a **1 GB Persistent Disk** and mount it at `/var/data`.
 4. Set `NODE_ENV=production`, `DATABASE_PATH=/var/data/vat-tournaments.sqlite`, `RETENTION_DAYS=30`, and `SQLITE_BACKUP_COUNT=7`.
 5. Set `PUBLIC_BASE_URL` to the final public HTTPS origin, for example `https://tournaments.example.com`. Set `SERVER_ACCESS_PASSWORD`, `MASTER_ADMIN_PASSWORD`, and a unique high-entropy `SESSION_SECRET` as Render secret environment variables. Do not put any of these values in source control, `render.yaml`, Vite variables, or build arguments.

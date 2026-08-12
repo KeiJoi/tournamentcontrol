@@ -87,7 +87,7 @@ Use [render.yaml](render.yaml) or follow [Render deployment](docs/deployment-ren
 
 ## Host the Tournament Server on Render
 
-Create one Render Node Web Service from this repository’s `main` branch, use `npm ci && npm run build` and `npm run start --workspace=@tournament-control/server`, and attach a 1 GB persistent disk at `/var/data`. Set every required secret in Render, set `DATABASE_PATH=/var/data/vat-tournaments.sqlite`, then configure a custom HTTPS domain and make `PUBLIC_BASE_URL` exactly match it. The service owns the compiled React UI, API, WebSockets, migrations, retention, and SQLite backups. Follow the complete [Render production setup](docs/render-setup.md); do not horizontally scale this SQLite deployment.
+Create one Render Node Web Service from this repository’s `main` branch, use `npm ci --include=dev && npm run build` and `npm run start --workspace=@tournament-control/server`, and attach a 1 GB persistent disk at `/var/data`. Set every required secret in Render, set `DATABASE_PATH=/var/data/vat-tournaments.sqlite`, then configure a custom HTTPS domain and make `PUBLIC_BASE_URL` exactly match it. The service owns the compiled React UI, API, WebSockets, migrations, retention, and SQLite backups. Follow the complete [Render production setup](docs/render-setup.md); do not horizontally scale this SQLite deployment.
 
 ## Install the Dalamud Plugin
 

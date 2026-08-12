@@ -5,7 +5,8 @@ services:
     branch: main
     plan: starter
     numInstances: 1
-    buildCommand: npm ci && npm run build
+    # Production runtime, but TypeScript/Vite are needed while compiling the web app.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start --workspace=@tournament-control/server
     healthCheckPath: /health
     disk:
