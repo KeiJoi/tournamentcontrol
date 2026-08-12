@@ -80,11 +80,11 @@ public sealed class MainWindow : Window, IDisposable
             {
                 if (!ImGui.BeginTabItem(round.Name)) continue;
                 foreach (var match in orderedMatches.Where(match => match.RoundId == round.Id)) DrawRoundMatch(match, people, matchNumbers[match.Id]);
+                DrawResultPopup(people, matchNumbers);
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();
         }
-        DrawResultPopup(state, people, matchNumbers);
         ImGui.Separator();
         if (ImGui.Button("Copy Public Bracket URL")) ImGui.SetClipboardText(PublicUrl(state.Tournament.PublicCode));
     }
@@ -121,7 +121,7 @@ public sealed class MainWindow : Window, IDisposable
             if (ImGui.SmallButton("Correct Result##" + match.Id)) { pendingWinner = (match.Id, match.WinnerId == first.Id ? second.Id : first.Id); ImGui.OpenPopup("Confirm Result"); }
         }
     }
-    private void DrawResultPopup(ControllerState state, IReadOnlyDictionary<string, ControllerContestant> people, IReadOnlyDictionary<string, int> matchNumbers)
+    private void DrawResultPopup(IReadOnlyDictionary<string, ControllerContestant> people, IReadOnlyDictionary<string, int> matchNumbers)
     {
         if (!ImGui.BeginPopupModal("Confirm Result", ImGuiWindowFlags.AlwaysAutoResize)) return;
         if (pendingWinner is not { } choice || !people.TryGetValue(choice.WinnerId, out var winner) || !matchNumbers.TryGetValue(choice.MatchId, out var matchNumber))
