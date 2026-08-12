@@ -40,7 +40,7 @@ public sealed class MainWindow : Window, IDisposable
     private void DrawSeedingController()
     {
         var state = selectedState!; ImGui.TextUnformatted("TOURNAMENT SEEDING"); ImGui.SameLine(); if (ImGui.SmallButton("Back to browser")) { selectedState = null; return; } ImGui.TextUnformatted(state.Tournament.TournamentName + " · Revision " + state.Tournament.Revision); ImGui.TextDisabled(state.Tournament.Status + " · " + state.Contestants.Count + " Players");
-        if (state.Tournament.Status != "SETUP") { DrawActiveController(state); return; }
+        if (state.Tournament.Status != "SETUP") { DrawRoundTabsController(state); return; }
         ImGui.InputText("Player Name", ref singlePlayer, 200); ImGui.SameLine(); if (ImGui.Button("Add") || (ImGui.IsItemHovered() && ImGui.IsKeyPressed(ImGuiKey.Enter))) _ = AddSingleAsync();
         ImGui.InputTextMultiline("Bulk entry", ref bulkPlayers, 16000, new System.Numerics.Vector2(-1, 90)); if (ImGui.Button("Add Bulk Entries")) _ = BulkAddAsync(); ImGui.TextDisabled(controllerStatus); ImGui.Separator();
         foreach (var player in state.Contestants.OrderBy(item => item.Seed).ToList()) DrawContestant(player);
@@ -65,6 +65,77 @@ public sealed class MainWindow : Window, IDisposable
         }
         if (pendingWinner is { } choice) { ImGui.Separator(); ImGui.TextColored(new System.Numerics.Vector4(1f, .5f, .1f, 1f), "Confirm selected winner?"); if (ImGui.Button("Confirm Result")) _ = SubmitWinnerAsync(choice.MatchId, choice.WinnerId); ImGui.SameLine(); if (ImGui.Button("Cancel Result")) pendingWinner = null; }
         ImGui.Separator(); if (ImGui.Button("Copy Public Bracket URL")) ImGui.SetClipboardText(PublicUrl(state.Tournament.PublicCode));
+    }
+    private void DrawRoundTabsController(ControllerState state)
+    {
+        var people = state.Contestants.ToDictionary(item => item.Id);
+        var orderedRounds = state.Rounds.OrderBy(round => round.RoundNumber).ToList();
+        var orderedMatches = orderedRounds.SelectMany(round => state.Matches.Where(match => match.RoundId == round.Id).OrderBy(match => match.Position)).ToList();
+        var matchNumbers = orderedMatches.Select((match, index) => new { match.Id, Number = index + 1 }).ToDictionary(item => item.Id, item => item.Number);
+        ImGui.TextColored(new System.Numerics.Vector4(.7f, 1f, .2f, 1f), "LIVE MATCH CONTROL");
+        ImGui.TextDisabled(controllerStatus);
+        if (ImGui.BeginTabBar("round-tabs"))
+        {
+            foreach (var round in orderedRounds)
+            {
+                if (!ImGui.BeginTabItem(round.Name)) continue;
+                foreach (var match in orderedMatches.Where(match => match.RoundId == round.Id)) DrawRoundMatch(match, people, matchNumbers[match.Id]);
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
+        }
+        DrawResultPopup(state, people, matchNumbers);
+        ImGui.Separator();
+        if (ImGui.Button("Copy Public Bracket URL")) ImGui.SetClipboardText(PublicUrl(state.Tournament.PublicCode));
+    }
+    private void DrawRoundMatch(ControllerMatch match, IReadOnlyDictionary<string, ControllerContestant> people, int matchNumber)
+    {
+        people.TryGetValue(match.Player1Id ?? "", out var first);
+        people.TryGetValue(match.Player2Id ?? "", out var second);
+        ImGui.Separator();
+        ImGui.TextUnformatted("MATCH " + matchNumber + " · " + match.Status);
+        ImGui.TextUnformatted((first is null ? "—" : "#" + first.Seed + " " + first.DisplayName) + "  vs  " + (second is null ? "—" : "#" + second.Seed + " " + second.DisplayName));
+        var unresolved = match.Status is "READY" or "IN_PROGRESS" && first is not null && second is not null;
+        if (unresolved)
+        {
+            var playerOne = first!;
+            var playerTwo = second!;
+            var plan = CalloutTemplate.CreatePlan(configuration.CalloutLine1, configuration.CalloutLine2, configuration.CalloutDelayMilliseconds, playerOne.DisplayName, playerTwo.DisplayName);
+            string? calloutReason = null;
+            var canCall = plan.IsValid;
+            if (canCall) canCall = callouts.CanSend(match.Id, out calloutReason);
+            if (!canCall) ImGui.BeginDisabled();
+            ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(.86f, .16f, .57f, 1f));
+            if (ImGui.Button(callouts.IsSending(match.Id) ? "SENDING CALLOUT...##" + match.Id : "CALL PLAYERS##" + match.Id, new System.Numerics.Vector2(-1, 0))) callouts.TrySend(match.Id, configuration.CalloutChannel, configuration.CalloutLine1, configuration.CalloutLine2, configuration.CalloutDelayMilliseconds, playerOne.DisplayName, playerTwo.DisplayName);
+            ImGui.PopStyleColor();
+            if (!canCall) ImGui.EndDisabled();
+            var calloutStatus = callouts.GetStatus(match.Id) ?? (plan.IsValid ? calloutReason : plan.First.Error ?? plan.Second.Error ?? "Configure at least one callout line first.");
+            if (!string.IsNullOrEmpty(calloutStatus)) ImGui.TextDisabled(calloutStatus);
+            if (ImGui.Button(playerOne.DisplayName + " Wins##" + match.Id)) { pendingWinner = (match.Id, playerOne.Id); ImGui.OpenPopup("Confirm Result"); }
+            ImGui.SameLine();
+            if (ImGui.Button(playerTwo.DisplayName + " Wins##" + match.Id)) { pendingWinner = (match.Id, playerTwo.Id); ImGui.OpenPopup("Confirm Result"); }
+        }
+        else if (match.WinnerId is not null && first is not null && second is not null)
+        {
+            ImGui.TextColored(new System.Numerics.Vector4(.7f, 1f, .2f, 1f), "Winner: " + (match.WinnerId == first.Id ? first.DisplayName : second.DisplayName));
+            if (ImGui.SmallButton("Correct Result##" + match.Id)) { pendingWinner = (match.Id, match.WinnerId == first.Id ? second.Id : first.Id); ImGui.OpenPopup("Confirm Result"); }
+        }
+    }
+    private void DrawResultPopup(ControllerState state, IReadOnlyDictionary<string, ControllerContestant> people, IReadOnlyDictionary<string, int> matchNumbers)
+    {
+        if (!ImGui.BeginPopupModal("Confirm Result", ImGuiWindowFlags.AlwaysAutoResize)) return;
+        if (pendingWinner is not { } choice || !people.TryGetValue(choice.WinnerId, out var winner) || !matchNumbers.TryGetValue(choice.MatchId, out var matchNumber))
+        {
+            pendingWinner = null;
+            ImGui.CloseCurrentPopup();
+            return;
+        }
+        ImGui.TextUnformatted("Record " + winner.DisplayName + " as the winner of Match " + matchNumber + "?");
+        ImGui.TextDisabled("The server remains authoritative and will reject stale or unsafe changes.");
+        if (ImGui.Button("Confirm Result")) { _ = SubmitWinnerAsync(choice.MatchId, choice.WinnerId); ImGui.CloseCurrentPopup(); }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel")) { pendingWinner = null; ImGui.CloseCurrentPopup(); }
+        ImGui.EndPopup();
     }
     private void DrawSetup()
     {

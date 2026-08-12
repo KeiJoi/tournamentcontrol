@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>TournamentControl.Dalamud</AssemblyName>
     <!-- This is the single release-version source. Release tags must be v$(Version). -->
-    <Version>0.1.2</Version>
+    <Version>0.1.3</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
     <Name>Tournament Bracket Controller</Name>

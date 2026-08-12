@@ -232,7 +232,7 @@ function controllerTournament(tournament: Tournament) {
 }
 function masterOrganizer(organizer: Organizer) { return { id: organizer.id, keyPrefix: organizer.keyPrefix ? `${organizer.keyPrefix}…` : null, createdAt: organizer.createdAt, lastUsedAt: organizer.lastUsedAt, revokedAt: organizer.revokedAt }; }
 function masterTournament(tournament: Tournament, playerCount: number) { return { id: tournament.id, publicCode: tournament.publicCode, venueName: tournament.venueName, gameName: tournament.gameName, tournamentName: tournament.tournamentName, eventDate: tournament.eventDate, status: tournament.status, playerCount, createdAt: tournament.createdAt }; }
-function bracketResponse(state: ReturnType<BracketService["state"]>) { return { tournament: controllerTournament(state.tournament), contestants: state.contestants, matches: state.matches }; }
+function bracketResponse(state: ReturnType<BracketService["state"]>) { return { tournament: controllerTournament(state.tournament), contestants: state.contestants, rounds: state.rounds, matches: state.matches }; }
 function bracketFailure(response: express.Response, exception: unknown, bracket: BracketService | undefined, tournamentId: string) {
   if (exception instanceof BracketError) {
     if (exception.code === "STALE") { const current = bracket?.state(tournamentId); return response.status(409).json({ error: { code: "STALE_TOURNAMENT", message: exception.message }, current: current ? bracketResponse(current) : undefined }); }

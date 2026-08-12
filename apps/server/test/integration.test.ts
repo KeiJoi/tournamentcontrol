@@ -75,6 +75,9 @@ describe("full tournament integration", () => {
     let mutation = await request(server).put(`/api/controller/tournaments/${tournamentId}/seeds`).set(authorization(controllerA)).send({ expectedRevision: revision, contestantIds: reversed }); expect(mutation.status).toBe(200); revision = mutation.body.tournament.revision;
     mutation = await request(server).post(`/api/controller/tournaments/${tournamentId}/seeds/randomize`).set(authorization(controllerA)).send({ expectedRevision: revision }); expect(mutation.status).toBe(200); revision = mutation.body.tournament.revision;
     mutation = await request(server).post(`/api/controller/tournaments/${tournamentId}/start`).set(authorization(controllerA)).send({ expectedRevision: revision }); expect(mutation.status).toBe(200); state = mutation.body; revision = state.tournament.revision;
+    expect(state.rounds.map((round: { roundNumber: number }) => round.roundNumber)).toEqual([1, 2, 3, 4]);
+    const orderedMatches = state.rounds.flatMap((round: { id: string }) => state.matches.filter((match: { roundId: string }) => match.roundId === round.id));
+    expect(orderedMatches).toEqual(state.matches);
     expect(state.matches.some((match: { status: string }) => match.status === "BYE")).toBe(true);
     const publicBefore = await request(server).get(`/api/public/tournaments/${publicCode}`); expect(publicBefore.status).toBe(200); expect(publicBefore.body.tournament.organizerId).toBeUndefined(); expect(publicBefore.body.contestants).toHaveLength(13);
 

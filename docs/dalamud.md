@@ -12,6 +12,10 @@ Callout preferences are local plugin settings, not tournament data. The configur
 
 The operator must explicitly press `CALL PLAYERS` for a ready match with two actual contestants; callouts are never automatic. A match has an in-progress guard and a short local cooldown, with no automatic retries. Sending is queued through `IChatGui.Print` with `XivChatEntry.Type` set to `XivChatType.Shout` or `XivChatType.Yell`. The second line uses cancellation-aware asynchronous delay; plugin unload cancels it, and chat failures (including unavailability between lines) are caught and shown as a concise UI status.
 
+## Live match navigation
+
+The active controller groups matches into one tab per authoritative bracket round. Match labels use a stable global number: every first-round match comes first, followed by every second-round match, and so on. Selecting a winner opens an immediate confirmation popup, so the operator never has to scroll through a full bracket to confirm the selected result.
+
 The unit tests in `apps/dalamud.tests` cover default Shout/Yell command construction, expansion, repeated and unknown placeholders, blank-line behavior, Unicode/control-character sanitization, length validation, delay sequencing, cancellation, and duplicate/cooldown prevention. They do not require a live FFXIV client.
 
 ## Manual in-game checklist
